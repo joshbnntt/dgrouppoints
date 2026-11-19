@@ -1,0 +1,12 @@
+{
+  "name": "dgroup-points",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "dev": "node --env-file=.env --watch server.ts",
+    "typecheck": "tsc"
+  },
+  "dependencies": { "remix": "^3.0.0" },
+  "devDependencies": { "@types/node": "^24.0.0", "typescript": "^5.9.0" }
+}
