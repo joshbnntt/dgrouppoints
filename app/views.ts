@@ -1,4 +1,4 @@
-import { html } from 'remix/html-template'
+import { html, type SafeHtml } from 'remix/html-template'
 import { createHtmlResponse } from 'remix/response/html'
 import { CATEGORIES, type Person } from './config.ts'
 import { routes } from './routes.ts'
@@ -23,7 +23,7 @@ button{font:inherit;border:0;border-radius:12px;padding:12px 18px;font-weight:70
 form{display:inline}form button{background:none;color:#e8b84a;padding:0;font-weight:400;text-decoration:underline}
 </style>`
 
-function page(title: string, body: unknown, script?: unknown) {
+function page(title: string, body: SafeHtml, script?: SafeHtml) {
   return createHtmlResponse(html`<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">

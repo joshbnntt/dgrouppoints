@@ -37,7 +37,7 @@ let googleProvider = createGoogleAuthProvider({
 // Rejects anyone who isn't the signed-in admin.
 function requireAdmin(): Middleware {
   return (context, next) => {
-    if (!context.get(Auth).ok) {
+    if (!context.get(Auth)?.ok) {
       return context.request.method === 'GET'
         ? redirect(routes.login.href())
         : new Response('Unauthorized', { status: 401 })
@@ -63,7 +63,7 @@ export let router = createRouter({
 })
 
 router.get(routes.home, async (context) => {
-  return scoreboardPage(await getPeople(), context.get(Auth).ok)
+  return scoreboardPage(await getPeople(), !!context.get(Auth)?.ok)
 })
 
 router.get(routes.login, (context) =>
