@@ -31,8 +31,11 @@ async function accessToken(): Promise<string> {
       assertion: `${unsigned}.${sig}`,
     }),
   })
-  let json = (await res.json()) as { access_token?: string; expires_in?: number }
-  if (!json.access_token) throw new Error('Service account auth failed')
+  let json = (await res.json()) as { access_token?: string; expires_in?: number; error?: string; error_description?: string }
+  if (!json.access_token) {
+    // Google's error text doesn't contain secrets; include it so failures are diagnosable.
+    throw new Error(`Service account auth failed: ${json.error ?? res.status} ${json.error_description ?? ''}`.trim())
+  }
   cached = { value: json.access_token, exp: Date.now() + (json.expires_in ?? 3600) * 1000 }
   return cached.value
 }
