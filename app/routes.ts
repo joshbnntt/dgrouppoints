@@ -11,6 +11,10 @@ export let routes = route({
   admin: {
     index: { method: 'GET', pattern: '/admin' },
     score: { method: 'POST', pattern: '/admin/score' },
+    roster: { method: 'GET', pattern: '/admin/roster' },
+    addPerson: { method: 'POST', pattern: '/admin/roster' },
+    updatePerson: { method: 'POST', pattern: '/admin/roster/:row' },
+    removePerson: { method: 'POST', pattern: '/admin/roster/:row/remove' },
     categories: { method: 'GET', pattern: '/admin/categories' },
     saveCategories: { method: 'POST', pattern: '/admin/categories' },
   },

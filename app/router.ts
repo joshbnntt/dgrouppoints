@@ -9,8 +9,8 @@ import { Session } from 'remix/session'
 import { redirect } from 'remix/response/redirect'
 import type { Category } from './config.ts'
 import { routes } from './routes.ts'
-import { addPoints, getCategories, getData, writeCategories } from './sheets.ts'
-import { adminPage, categoriesPage, scoreboardPage } from './views.ts'
+import { addPerson, addPoints, getCategories, getData, removePerson, StaleRowError, updatePerson, writeCategories } from './sheets.ts'
+import { adminPage, categoriesPage, rosterPage, scoreboardPage } from './views.ts'
 import { iconResponse, manifestResponse, serviceWorkerResponse } from './pwa.ts'
 
 let env = process.env
@@ -95,6 +95,18 @@ router.post(routes.logout, (context) => {
   return redirect(routes.home.href())
 })
 
+let clean = (v: FormDataEntryValue | null, max: number) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
+let back = (key: 'msg' | 'error', text: string) =>
+  redirect(`${routes.admin.roster.href()}?${new URLSearchParams({ [key]: text })}`)
+async function staleSafe(fn: () => Promise<Response>) {
+  try {
+    return await fn()
+  } catch (e) {
+    if (e instanceof StaleRowError) return back('error', e.message)
+    throw e
+  }
+}
+
 router.map(routes.admin, {
   middleware: [requireAdmin()],
   actions: {
@@ -104,12 +116,57 @@ router.map(routes.admin, {
     async score(context) {
       let f = context.get(FormData)
       let row = Number(f.get('row')), cat = Number(f.get('cat')), dir = Number(f.get('dir'))
+      let name = String(f.get('name') ?? '')
       let categories = await getCategories()
       // The server decides the amount from the category, so a tap always adds exactly its point value.
       if (!Number.isInteger(row) || row < 2 || !categories[cat] || (dir !== 1 && dir !== -1)) {
         return new Response('Bad request', { status: 400 })
       }
-      return Response.json({ value: await addPoints(row, cat, dir * categories[cat].pts) })
+      try {
+        return Response.json({ value: await addPoints(row, name, cat, dir * categories[cat].pts) })
+      } catch (e) {
+        if (e instanceof StaleRowError) return new Response(e.message, { status: 409 })
+        throw e
+      }
+    },
+    async roster(context) {
+      let sp = context.url.searchParams
+      return rosterPage(await getData(), sp.get('msg') ?? '', sp.get('error') ?? '')
+    },
+    async addPerson(context) {
+      let f = context.get(FormData)
+      let name = clean(f.get('name'), 40), team = clean(f.get('team'), 30)
+      if (!name || !team) return back('error', 'Name and team are both required.')
+      let { categories, people } = await getData()
+      if (people.some((p) => p.name.toLowerCase() === name.toLowerCase())) {
+        return back('error', `${name} is already on the roster.`)
+      }
+      await addPerson(name, team, categories.length)
+      return back('msg', `Added ${name} to ${team}.`)
+    },
+    async updatePerson(context) {
+      let f = context.get(FormData)
+      let row = Number(context.params.row)
+      let expected = String(f.get('expected') ?? '')
+      let name = clean(f.get('name'), 40), team = clean(f.get('team'), 30)
+      if (!Number.isInteger(row) || row < 2 || !name || !team) return back('error', 'Name and team are both required.')
+      let { people } = await getData()
+      if (people.some((p) => p.row !== row && p.name.toLowerCase() === name.toLowerCase())) {
+        return back('error', `Someone else is already called ${name}.`)
+      }
+      return staleSafe(async () => {
+        await updatePerson(row, expected, name, team)
+        return back('msg', `Saved ${name}.`)
+      })
+    },
+    async removePerson(context) {
+      let row = Number(context.params.row)
+      let expected = String(context.get(FormData).get('expected') ?? '')
+      if (!Number.isInteger(row) || row < 2) return back('error', 'Bad request.')
+      return staleSafe(async () => {
+        await removePerson(row, expected)
+        return back('msg', `Removed ${expected}.`)
+      })
     },
     async categories(context) {
       return categoriesPage(await getCategories(), context.url.searchParams.has('saved'))

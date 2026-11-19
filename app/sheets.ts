@@ -124,13 +124,53 @@ export async function writeCategories(cats: Category[]) {
   })
 }
 
-export async function addPoints(row: number, cat: number, delta: number): Promise<number> {
+export class StaleRowError extends Error {
+  constructor() { super('That roster row changed. Reload the page and try again.') }
+}
+
+// Rows are addressed by sheet row number. Each write first checks the name in
+// column A still matches, so a page left open while the roster changed can't
+// write to the wrong person.
+async function checkRow(row: number, expectedName: string) {
+  let cur = await sheets(`/values/${q(`${TAB()}!A${row}`)}`)
+  if (String(cur.values?.[0]?.[0] ?? '').trim() !== expectedName) throw new StaleRowError()
+}
+
+export async function addPoints(row: number, name: string, cat: number, delta: number): Promise<number> {
   let range = q(`${TAB()}!${catCol(cat)}${row}`)
-  let cur = await sheets(`/values/${range}`)
-  let next = Math.max(0, (Number(cur.values?.[0]?.[0]) || 0) + delta)
+  let res = await sheets<{ valueRanges: ValueRange[] }>(
+    `/values:batchGet?ranges=${q(`${TAB()}!A${row}`)}&ranges=${range}`,
+  )
+  if (String(res.valueRanges[0]?.values?.[0]?.[0] ?? '').trim() !== name) throw new StaleRowError()
+  let next = Math.max(0, (Number(res.valueRanges[1]?.values?.[0]?.[0]) || 0) + delta)
   await sheets(`/values/${range}?valueInputOption=RAW`, {
     method: 'PUT',
     body: JSON.stringify({ values: [[next]] }),
   })
   return next
+}
+
+// Appends after the last used row, with 0 in every category column.
+export async function addPerson(name: string, team: string, categoryCount: number) {
+  let col = await sheets(`/values/${q(`${TAB()}!A:A`)}`)
+  let row = Math.max(2, (col.values?.length ?? 0) + 1)
+  let last = catCol(Math.max(categoryCount, 1) - 1)
+  await sheets(`/values/${q(`${TAB()}!A${row}:${last}${row}`)}?valueInputOption=RAW`, {
+    method: 'PUT',
+    body: JSON.stringify({ values: [[name, team, ...Array(categoryCount).fill(0)]] }),
+  })
+}
+
+export async function updatePerson(row: number, expectedName: string, name: string, team: string) {
+  await checkRow(row, expectedName)
+  await sheets(`/values/${q(`${TAB()}!A${row}:B${row}`)}?valueInputOption=RAW`, {
+    method: 'PUT',
+    body: JSON.stringify({ values: [[name, team]] }),
+  })
+}
+
+// Clears the row instead of deleting it, so other rows keep their row numbers.
+export async function removePerson(row: number, expectedName: string) {
+  await checkRow(row, expectedName)
+  await sheets(`/values/${q(`${TAB()}!A${row}:ZZ${row}`)}:clear`, { method: 'POST', body: '{}' })
 }

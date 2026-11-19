@@ -29,6 +29,9 @@ npm run dev            # http://localhost:3000
 Push to GitHub → import in Vercel (Framework Preset: **Other**) → add the env vars (set `APP_ORIGIN` to your production URL) → deploy.
 `api/index.ts` exports the router as a fetch handler and `vercel.json` rewrites every path to it.
 
+## Roster
+Admins add, rename, move and remove teens at **/admin/roster**. Removing someone clears their row (it isn't deleted) so other rows keep their positions; blank rows are ignored.
+
 ## Install as an app
 Open the site on a phone: iPhone Safari → Share → **Add to Home Screen**; Android Chrome → menu → **Install app**. The scoreboard shows the last loaded scores when offline.
 
