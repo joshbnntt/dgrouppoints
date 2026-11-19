@@ -11,5 +11,7 @@ export let routes = route({
   admin: {
     index: { method: 'GET', pattern: '/admin' },
     score: { method: 'POST', pattern: '/admin/score' },
+    categories: { method: 'GET', pattern: '/admin/categories' },
+    saveCategories: { method: 'POST', pattern: '/admin/categories' },
   },
 })

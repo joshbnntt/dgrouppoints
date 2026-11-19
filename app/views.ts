@@ -1,6 +1,6 @@
 import { html, type SafeHtml } from 'remix/html-template'
 import { createHtmlResponse } from 'remix/response/html'
-import { CATEGORIES, type Person } from './config.ts'
+import type { Category, Data } from './config.ts'
 import { routes } from './routes.ts'
 
 let join = (parts: unknown[]) => html.raw`${parts.map(String).join('')}`
@@ -20,7 +20,12 @@ button{font:inherit;border:0;border-radius:12px;padding:12px 18px;font-weight:70
 .add{background:#e8b84a;color:#0b1a3a}.sub{background:#2b4175;color:#fff;padding:12px 14px}
 .chips{display:flex;gap:8px;flex-wrap:wrap;position:sticky;top:0;background:#0b1a3a;padding:8px 0}
 .chip{background:#2b4175;color:#fff}.chip.on{background:#e8b84a;color:#0b1a3a}
-form{display:inline}form button{background:none;color:#e8b84a;padding:0;font-weight:400;text-decoration:underline}
+form{display:inline}
+.cats{display:block}.cat{display:grid;grid-template-columns:1fr 7rem 5rem auto;gap:8px;align-items:center;padding:8px 0;border-top:1px solid #ffffff18}
+.cat input[type=text],.cat input[type=number]{font:inherit;width:100%;padding:10px;border-radius:10px;border:1px solid #ffffff30;background:#0b1a3a;color:#fff}
+.cat label{display:flex;gap:6px;align-items:center;font-size:.9rem;white-space:nowrap}.cat.head{font-size:.75rem;color:#e8b84a;text-transform:uppercase;border:0}
+.save{background:#e8b84a;color:#0b1a3a;margin-top:12px}.note{opacity:.75;font-size:.9rem}.ok{background:#1f5a4f;padding:10px 14px;border-radius:10px}
+@media(max-width:560px){.cat{grid-template-columns:1fr 5rem 4rem}.cat label{grid-column:1/-1}.cat.head span:last-child{display:none}}form button{background:none;color:#e8b84a;padding:0;font-weight:400;text-decoration:underline}
 </style>`
 
 let swScript = html.raw`<script>if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('/sw.js'))</script>`
@@ -41,7 +46,9 @@ ${css}${swScript}</head>
 <body><main>${body}${script ?? ''}</main></body></html>`)
 }
 
-export function scoreboardPage(people: Person[], admin: boolean) {
+export function scoreboardPage({ categories, people }: Data, admin: boolean) {
+  // Hidden categories drop off the table, but points already earned still count in totals.
+  let visible = categories.map((c, i) => ({ c, i })).filter(({ c }) => c.show)
   let teams = [...new Set(people.map((p) => p.team))]
     .map((name) => {
       let members = people.filter((p) => p.team === name).sort((a, b) => sum(b.pts) - sum(a.pts))
@@ -53,8 +60,8 @@ export function scoreboardPage(people: Person[], admin: boolean) {
     <section class="card" style="--c:${COLORS[i % 4]}">
       <div class="top"><h2>${i === 0 && t.total > 0 ? '🏆 ' : ''}${t.name}</h2><span class="big">${t.total}</span></div>
       <div style="overflow-x:auto"><table>
-        <thead><tr><th>Name</th>${join(CATEGORIES.map((c) => html`<th>${c.short}</th>`))}<th>Total</th></tr></thead>
-        <tbody>${join(t.members.map((m) => html`<tr><td>${m.name}</td>${join(m.pts.map((v) => html`<td>${v}</td>`))}<td><b>${sum(m.pts)}</b></td></tr>`))}</tbody>
+        <thead><tr><th>Name</th>${join(visible.map(({ c }) => html`<th>${c.short}</th>`))}<th>Total</th></tr></thead>
+        <tbody>${join(t.members.map((m) => html`<tr><td>${m.name}</td>${join(visible.map(({ i }) => html`<td>${m.pts[i]}</td>`))}<td><b>${sum(m.pts)}</b></td></tr>`))}</tbody>
       </table></div>
     </section>`)
 
@@ -67,9 +74,10 @@ export function scoreboardPage(people: Person[], admin: boolean) {
   html.raw`<script>setTimeout(()=>location.reload(),30000)</script>`)
 }
 
-export function adminPage(people: Person[]) {
+export function adminPage({ categories, people }: Data) {
   let teams = [...new Set(people.map((p) => p.team))]
-  let chips = CATEGORIES.map((c, i) => html`<button class="chip${i === 0 ? ' on' : ''}" data-cat="${i}" data-pts="${c.pts}">${c.label}</button>`)
+  let active = categories.map((c, i) => ({ c, i })).filter(({ c }) => c.show)
+  let chips = active.map(({ c, i }, n) => html`<button class="chip${n === 0 ? ' on' : ''}" data-cat="${i}">${c.label} (${c.pts})</button>`)
   let cards = teams.map((t) => html`
     <section class="card"><h2>${t}</h2>${join(people.filter((p) => p.team === t).map((p) => html`
       <div class="row" data-row="${p.row}" data-vals="${JSON.stringify(p.pts)}">
@@ -78,16 +86,16 @@ export function adminPage(people: Person[]) {
       </div>`))}</section>`)
 
   let script = html.raw`<script>
-let cat=0,pts=${JSON.stringify(CATEGORIES.map((c) => c.pts))};
+let cat=${active[0]?.i ?? 0},pts=${JSON.stringify(categories.map((c) => c.pts))};
 let rows=[...document.querySelectorAll('.row')];
 function paint(){rows.forEach(r=>{let v=JSON.parse(r.dataset.vals);r.querySelector('.v').textContent=v[cat];r.querySelector('.add').textContent='+'+pts[cat]})
 document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',+c.dataset.cat===cat))}
 document.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{cat=+c.dataset.cat;paint()});
 rows.forEach(r=>r.onclick=async e=>{
   let b=e.target.closest('button');if(!b)return;
-  let delta=b.classList.contains('add')?pts[cat]:-pts[cat];
+  let dir=b.classList.contains('add')?1:-1,delta=dir*pts[cat];
   let v=JSON.parse(r.dataset.vals),old=v[cat];v[cat]=Math.max(0,old+delta);r.dataset.vals=JSON.stringify(v);paint();
-  let f=new FormData();f.set('row',r.dataset.row);f.set('cat',cat);f.set('delta',delta);
+  let f=new FormData();f.set('row',r.dataset.row);f.set('cat',cat);f.set('dir',dir);
   try{let res=await fetch('${routes.admin.score.href()}',{method:'POST',body:f});
     if(!res.ok)throw 0;v[cat]=(await res.json()).value;r.dataset.vals=JSON.stringify(v);paint()}
   catch{v[cat]=old;r.dataset.vals=JSON.stringify(v);paint();alert('Save failed - check connection / login')}
@@ -97,6 +105,36 @@ rows.forEach(r=>r.onclick=async e=>{
   return page('Enter Points', html`
     <h1>Enter Points</h1>
     <p><a href="${routes.home.href()}">← Scoreboard</a> ·
+      <a href="${routes.admin.categories.href()}">Categories</a> ·
       <form method="POST" action="${routes.logout.href()}"><button>Log out</button></form></p>
-    <div class="chips">${join(chips)}</div>${join(cards)}`, script)
+    ${active.length
+      ? html`<div class="chips">${join(chips)}</div>${join(cards)}`
+      : html`<p>No categories are shown. <a href="${routes.admin.categories.href()}">Add or show one</a>.</p>`}`, script)
+}
+
+export function categoriesPage(categories: Category[], saved = false, error = '') {
+  let row = (c: Category | null, i: number) => html`
+    <div class="cat">
+      <input type="text" name="label" value="${c?.label ?? ''}" placeholder="${c ? '' : 'New category name'}" aria-label="Name" maxlength="40">
+      <input type="text" name="short" value="${c?.short ?? ''}" placeholder="Short" aria-label="Short label" maxlength="12">
+      <input type="number" name="pts" value="${c?.pts ?? ''}" placeholder="Pts" aria-label="Points" min="0" max="1000" step="1">
+      <label><input type="checkbox" name="show" value="${i}" ${c ? (c.show ? html.raw`checked` : '') : html.raw`checked`}> Show</label>
+    </div>`
+
+  return page('Categories', html`
+    <h1>Categories</h1>
+    <p><a href="${routes.admin.index.href()}">← Enter points</a></p>
+    ${saved ? html`<p class="ok">Saved.</p>` : ''}
+    ${error ? html`<p class="ok" style="background:#7a2b22">${error}</p>` : ''}
+    <form class="cats" method="POST" action="${routes.admin.saveCategories.href()}">
+      <section class="card">
+        <div class="cat head"><span>Name</span><span>Short</span><span>Points</span><span>Show</span></div>
+        ${join(categories.map((c, i) => row(c, i)))}
+        ${row(null, categories.length)}
+        <button class="save" type="submit">Save categories</button>
+      </section>
+    </form>
+    <p class="note">Fill in the blank last row to add a category. Points are what one tap of + adds; changing them only affects future taps.
+    Unticking <b>Show</b> hides a category from entry and the scoreboard, but points already earned still count in totals.
+    To delete or reorder categories, edit the <b>Categories</b> tab in the sheet and move the matching Roster column with it.</p>`)
 }

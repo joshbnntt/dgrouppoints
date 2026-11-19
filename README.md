@@ -9,7 +9,9 @@ Tab `Roster`, header in row 1, one teen per row:
 |---|---|---|---|---|---|---|
 | Sarah Kate | Light Stalkers | 0 | 0 | 0 | 0 | 0 |
 
-Cells are running totals. Labels/point values: `app/config.ts` (keep column order in sync).
+Cells are running totals.
+
+Categories (name, short label, points per tap, show/hide) live on a **Categories** tab, created automatically on first run. Admins edit them at **/admin/categories**; row order there matches the Roster columns from C onward.
 
 ## Google Cloud
 1. Enable the **Google Sheets API**.
