@@ -9,7 +9,7 @@ let COLORS = ['#4fb3a5', '#e8604c', '#e8b84a', '#5b7cff']
 
 let css = html.raw`<style>
 *{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:#0b1a3a;color:#fff}
-main{max-width:900px;margin:0 auto;padding:16px}a{color:#e8b84a}
+main{max-width:900px;margin:0 auto;padding:16px;padding-top:max(16px,env(safe-area-inset-top))}a{color:#e8b84a}
 .card{background:#172a52;border-radius:16px;padding:16px;margin:12px 0;border-left:6px solid var(--c,#4fb3a5)}
 .top{display:flex;justify-content:space-between;align-items:center}.big{font-size:2.6rem;font-weight:800}
 table{width:100%;border-collapse:collapse}th,td{padding:6px 8px;text-align:right}th:first-child,td:first-child{text-align:left}
@@ -23,11 +23,21 @@ button{font:inherit;border:0;border-radius:12px;padding:12px 18px;font-weight:70
 form{display:inline}form button{background:none;color:#e8b84a;padding:0;font-weight:400;text-decoration:underline}
 </style>`
 
+let swScript = html.raw`<script>if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('/sw.js'))</script>`
+
 function page(title: string, body: SafeHtml, script?: SafeHtml) {
   return createHtmlResponse(html`<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${title}</title>${css}</head>
+<title>${title}</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0b1a3a">
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="DG Points">
+${css}${swScript}</head>
 <body><main>${body}${script ?? ''}</main></body></html>`)
 }
 
@@ -43,7 +53,7 @@ export function scoreboardPage(people: Person[], admin: boolean) {
     <section class="card" style="--c:${COLORS[i % 4]}">
       <div class="top"><h2>${i === 0 && t.total > 0 ? '🏆 ' : ''}${t.name}</h2><span class="big">${t.total}</span></div>
       <div style="overflow-x:auto"><table>
-        <thead><tr><th>Name</th>${join(CATEGORIES.map((c) => html`<th>${c.label.split(' ')[0]}</th>`))}<th>Total</th></tr></thead>
+        <thead><tr><th>Name</th>${join(CATEGORIES.map((c) => html`<th>${c.short}</th>`))}<th>Total</th></tr></thead>
         <tbody>${join(t.members.map((m) => html`<tr><td>${m.name}</td>${join(m.pts.map((v) => html`<td>${v}</td>`))}<td><b>${sum(m.pts)}</b></td></tr>`))}</tbody>
       </table></div>
     </section>`)

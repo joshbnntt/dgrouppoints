@@ -11,13 +11,17 @@ import { CATEGORIES } from './config.ts'
 import { routes } from './routes.ts'
 import { addPoints, getPeople } from './sheets.ts'
 import { adminPage, scoreboardPage } from './views.ts'
+import { iconResponse, manifestResponse, serviceWorkerResponse } from './pwa.ts'
 
 let env = process.env
 let origin =
   env.APP_ORIGIN ??
   (env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${env.VERCEL_PROJECT_PRODUCTION_URL}` : 'http://localhost:3000')
-let isAdminEmail = (email?: string | null) =>
-  !!email && email.toLowerCase() === (env.ADMIN_EMAIL ?? '').toLowerCase()
+// ADMIN_EMAIL may hold several addresses separated by commas, e.g. "a@gmail.com, b@gmail.com"
+let adminEmails = new Set(
+  (env.ADMIN_EMAIL ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
+)
+let isAdminEmail = (email?: string | null) => !!email && adminEmails.has(email.toLowerCase())
 
 let sessionCookie = createCookie('__session', {
   secrets: [env.SESSION_SECRET ?? 'dev-only-secret'],
@@ -61,6 +65,10 @@ export let router = createRouter({
     }),
   ],
 })
+
+router.get(routes.manifest, () => manifestResponse())
+router.get(routes.sw, () => serviceWorkerResponse())
+router.get(routes.icon, ({ params }) => iconResponse(params.name))
 
 router.get(routes.home, async (context) => {
   return scoreboardPage(await getPeople(), !!context.get(Auth)?.ok)

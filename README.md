@@ -27,5 +27,11 @@ npm run dev            # http://localhost:3000
 Push to GitHub → import in Vercel (Framework Preset: **Other**) → add the env vars (set `APP_ORIGIN` to your production URL) → deploy.
 `api/index.ts` exports the router as a fetch handler and `vercel.json` rewrites every path to it.
 
+## Install as an app
+Open the site on a phone: iPhone Safari → Share → **Add to Home Screen**; Android Chrome → menu → **Install app**. The scoreboard shows the last loaded scores when offline.
+
+## Admins
+`ADMIN_EMAIL` accepts several comma-separated Google accounts. While the OAuth consent screen is in *Testing*, each admin must also be added there as a test user.
+
 ## Security
 `/` is public read-only. `/admin` and `POST /admin/score` require a session created by Google login for `ADMIN_EMAIL` (verified email). Cookie is signed, httpOnly, SameSite=Lax.
